@@ -1,6 +1,9 @@
 // src/main/java/com/acme/social/api/AuthController.java
 package com.acme.social.api;
 
+import com.acme.social.api.model.RegisterResponse;
+import com.acme.social.application.dto.RegisterRequest;
+import com.acme.social.application.usecases.RegisterUserUseCase;
 import com.acme.social.api.model.LoginRequest;
 import com.acme.social.api.model.LoginResponse;
 import com.acme.social.infrastructure.db.AuthRepository;
@@ -10,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -26,12 +30,27 @@ public class AuthController {
 
     private final AuthRepository authRepository;
     private final JwtService jwtService;
+    private final RegisterUserUseCase registerUserUseCase;
     private final BCryptPasswordEncoder passwordEncoder;
 
-    public AuthController(AuthRepository authRepository, JwtService jwtService) {
+    public AuthController(
+            AuthRepository authRepository,
+            JwtService jwtService,
+            RegisterUserUseCase registerUserUseCase
+    ) {
         this.authRepository = authRepository;
         this.jwtService = jwtService;
+        this.registerUserUseCase = registerUserUseCase;
         this.passwordEncoder = new BCryptPasswordEncoder();
+    }
+
+    @PostMapping("/register")
+    @Operation(summary = "Registrar usuario nuevo")
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest req) {
+        var result = registerUserUseCase.execute(req);
+        log.info("Register OK username={} userId={}", req.username(), result.id());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new RegisterResponse(result.id(), result.alias()));
     }
 
     @PostMapping("/login")

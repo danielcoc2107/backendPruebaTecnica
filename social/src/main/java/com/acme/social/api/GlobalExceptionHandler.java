@@ -1,6 +1,7 @@
 // src/main/java/com/acme/social/api/GlobalExceptionHandler.java
 package com.acme.social.api;
 
+import com.acme.social.application.exceptions.DuplicateUserException;
 import com.acme.social.observability.CorrelationIdFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
@@ -51,6 +52,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException ex, HttpServletRequest request) {
         log.warn("Data integrity violation path={}", request.getRequestURI());
         return build(HttpStatus.CONFLICT, "Violacion de integridad", request);
+    }
+
+    @ExceptionHandler(DuplicateUserException.class)
+    public ResponseEntity<ErrorResponse> handleDuplicateUser(DuplicateUserException ex, HttpServletRequest request) {
+        log.warn("Duplicate user path={} message={}", request.getRequestURI(), ex.getMessage());
+        return build(HttpStatus.CONFLICT, ex.getMessage(), request);
     }
 
     @ExceptionHandler(Exception.class)

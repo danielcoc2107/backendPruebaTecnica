@@ -1,6 +1,8 @@
 package com.acme.social.api;
 
 import com.acme.social.config.SecurityConfig;
+import com.acme.social.application.dto.RegisterResult;
+import com.acme.social.application.usecases.RegisterUserUseCase;
 import com.acme.social.infrastructure.db.AuthRepository;
 import com.acme.social.security.jwt.JwtService;
 import org.junit.jupiter.api.Test;
@@ -19,6 +21,7 @@ import java.util.UUID;
 
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -36,6 +39,31 @@ class AuthControllerRestIntegrationTest {
 
     @MockBean
     private JwtService jwtService;
+
+    @MockBean
+    private RegisterUserUseCase registerUserUseCase;
+
+    @Test
+    void registerShouldReturnCreated() throws Exception {
+        UUID userId = UUID.fromString("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        when(registerUserUseCase.execute(any())).thenReturn(new RegisterResult(userId, "ana_l"));
+
+        mockMvc.perform(post("/api/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "username": "ana",
+                                  "password": "Ana12345!",
+                                  "nombres": "Ana",
+                                  "apellidos": "Lopez",
+                                  "fechaNacimiento": "1995-04-12",
+                                  "alias": "ana_l"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(userId.toString()))
+                .andExpect(jsonPath("$.alias").value("ana_l"));
+    }
 
     @Test
     void loginShouldReturnToken() throws Exception {
