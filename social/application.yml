@@ -1,0 +1,14 @@
+server:
+  port: 8080
+
+security:
+  jwt:
+    secret: "CAMBIA_ESTE_SECRET_LARGO_DE_32+_CARACTERES_1234567890_ABCDEFG"
+
+springdoc:
+  swagger-ui:
+    path: /docs
+
+logging:
+  level:
+    com.acme.social: INFO
