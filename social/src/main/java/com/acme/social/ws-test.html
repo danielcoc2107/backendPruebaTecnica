@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>STOMP Likes Test</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    input, textarea, button { padding: 10px; font-size: 14px; }
+    input, textarea { width: 100%; box-sizing: border-box; }
+    button { cursor: pointer; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 12px; margin-top: 12px; }
+    .log { white-space: pre-wrap; background: #0b1020; color: #dbe7ff; padding: 12px; border-radius: 12px; min-height: 200px; }
+    label { font-size: 12px; color: #555; display: block; margin-bottom: 6px; }
+    .ok { color: #0a7f2e; font-weight: 600; }
+    .bad { color: #b00020; font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<h2>Prueba Likes en tiempo real (SockJS + STOMP)</h2>
+
+<div class="card">
+  <div class="row">
+    <div style="flex: 2; min-width: 260px;">
+      <label>Base URL backend</label>
+      <input id="baseUrl" value="http://localhost:8080" />
+    </div>
+
+    <div style="flex: 3; min-width: 260px;">
+      <label>JWT (Bearer token)</label>
+      <input id="token" value="TOKEN_AQUI" />
+    </div>
+  </div>
+
+  <div class="row" style="margin-top: 10px;">
+    <div style="flex: 2; min-width: 260px;">
+      <label>Post ID (UUID)</label>
+      <input id="postId" value="22222222-2222-2222-2222-222222222222" />
+    </div>
+
+    <div style="flex: 1; min-width: 220px;">
+      <label>Correlation ID</label>
+      <input id="corrId" value="html-ws-001" />
+    </div>
+  </div>
+
+  <div class="row" style="margin-top: 12px;">
+    <button id="btnConnect">🔌 Conectar</button>
+    <button id="btnSubscribe" disabled>📡 Suscribirse</button>
+    <button id="btnToggle" disabled>❤️ Toggle Like</button>
+    <button id="btnDisconnect" disabled>🔌 Desconectar</button>
+    <span id="status" style="align-self:center;"></span>
+  </div>
+</div>
+
+<div class="card">
+  <label>Logs</label>
+  <div id="log" class="log"></div>
+</div>
+
+<!-- ✅ SockJS + STOMP desde CDN -->
+<script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+
+<script>
+  const el = (id) => document.getElementById(id);
+
+  const logBox = el("log");
+  const statusEl = el("status");
+
+  let stompClient = null;
+  let subscription = null;
+
+  function log(msg) {
+    const ts = new Date().toISOString();
+    logBox.textContent += `[${ts}] ${msg}\n`;
+    logBox.scrollTop = logBox.scrollHeight;
+  }
+
+  function setStatus(ok, text) {
+    statusEl.textContent = text;
+    statusEl.className = ok ? "ok" : "bad";
+  }
+
+  function buildTopic(postId) {
+    return `/topic/posts/${postId}/likes`;
+  }
+
+  el("btnConnect").addEventListener("click", () => {
+    const baseUrl = el("baseUrl").value.trim();
+    const token = el("token").value.trim();
+    const corrId = el("corrId").value.trim();
+
+    if (!baseUrl) { setStatus(false, "Base URL requerida"); return; }
+    if (!token || token === "TOKEN_AQUI") { setStatus(false, "Pega el JWT en el campo token"); return; }
+
+    const wsUrl = `${baseUrl}/ws`;
+    log(`Conectando a ${wsUrl} ...`);
+
+    const socket = new SockJS(wsUrl);
+    stompClient = Stomp.over(socket);
+
+    // Opcional: desactiva logs internos de stomp si quieres menos ruido
+    stompClient.debug = (str) => log(`[stomp] ${str}`);
+
+    const headers = {
+      Authorization: `Bearer ${token}`,
+      "X-Correlation-Id": corrId || "html-ws-001"
+    };
+
+    stompClient.connect(headers, () => {
+      setStatus(true, "Conectado ✅");
+      log("STOMP CONNECT OK");
+      el("btnSubscribe").disabled = false;
+      el("btnDisconnect").disabled = false;
+      el("btnConnect").disabled = true;
+    }, (err) => {
+      setStatus(false, "Error al conectar ❌");
+      log("CONNECT ERROR: " + JSON.stringify(err));
+    });
+  });
+
+  el("btnSubscribe").addEventListener("click", () => {
+    if (!stompClient) return;
+
+    const postId = el("postId").value.trim();
+    if (!postId) { setStatus(false, "Post ID requerido"); return; }
+
+    const topic = buildTopic(postId);
+    log(`Suscribiendo a ${topic} ...`);
+
+    if (subscription) subscription.unsubscribe();
+
+    subscription = stompClient.subscribe(topic, (message) => {
+      log(`EVENT ${topic}: ${message.body}`);
+    });
+
+    setStatus(true, "Suscrito ✅");
+    el("btnToggle").disabled = false;
+    el("btnSubscribe").disabled = true;
+  });
+
+  el("btnToggle").addEventListener("click", () => {
+    if (!stompClient) return;
+
+    const postId = el("postId").value.trim();
+    if (!postId) { setStatus(false, "Post ID requerido"); return; }
+
+    const destination = "/app/likes/toggle";
+    const body = JSON.stringify({ postId });
+
+    log(`SEND ${destination} body=${body}`);
+    stompClient.send(destination, {}, body);
+  });
+
+  el("btnDisconnect").addEventListener("click", () => {
+    if (!stompClient) return;
+
+    if (subscription) {
+      subscription.unsubscribe();
+      subscription = null;
+    }
+
+    stompClient.disconnect(() => {
+      setStatus(true, "Desconectado ✅");
+      log("DISCONNECTED");
+      el("btnConnect").disabled = false;
+      el("btnSubscribe").disabled = true;
+      el("btnToggle").disabled = true;
+      el("btnDisconnect").disabled = true;
+    });
+
+    stompClient = null;
+  });
+</script>
+
+</body>
+</html>

@@ -5,6 +5,8 @@ import com.acme.social.api.model.LoginRequest;
 import com.acme.social.api.model.LoginResponse;
 import com.acme.social.infrastructure.db.AuthRepository;
 import com.acme.social.security.jwt.JwtService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,6 +18,7 @@ import java.time.Duration;
 
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "Auth", description = "Autenticacion y emision de JWT")
 public class AuthController {
 
     private static final Logger log = LoggerFactory.getLogger(AuthController.class);
@@ -32,6 +35,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
+    @Operation(summary = "Autenticar usuario y generar access token JWT")
     public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest req) {
         var user = authRepository.findByUsername(req.username())
                 .orElseThrow(() -> new IllegalArgumentException("Credenciales inválidas"));

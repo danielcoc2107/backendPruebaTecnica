@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
@@ -34,22 +35,55 @@ public final class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        Optional<String> tokenOpt = extractBearerToken(request.getHeader("Authorization"));
+        try {
+            Optional<String> tokenOpt = extractBearerToken(request.getHeader("Authorization"));
 
-        if (tokenOpt.isPresent() && jwtService.isValid(tokenOpt.get())) {
-            String subject = jwtService.extractSubject(tokenOpt.get()); // UUID string
-            var auth = new UsernamePasswordAuthenticationToken(
-                    subject, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))
-            );
-            SecurityContextHolder.getContext().setAuthentication(auth);
+            if (tokenOpt.isPresent() && SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                String token = tokenOpt.get();
+
+                if (jwtService.isValid(token)) {
+
+                    String subject = jwtService.extractSubject(token); // UUID del usuario
+
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    subject,
+                                    null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_USER"))
+                            );
+
+                    authentication.setDetails(
+                            new WebAuthenticationDetailsSource().buildDetails(request)
+                    );
+
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                    log.debug("JWT autenticado correctamente para userId={}", subject);
+
+                } else {
+                    log.warn("JWT inválido recibido en request URI={}", request.getRequestURI());
+                }
+            }
+
+            filterChain.doFilter(request, response);
+
+        } catch (Exception ex) {
+            log.error("Error procesando JWT para URI={}", request.getRequestURI(), ex);
+            SecurityContextHolder.clearContext();
+            filterChain.doFilter(request, response);
         }
-
-        filterChain.doFilter(request, response);
     }
 
     private Optional<String> extractBearerToken(String header) {
-        if (header == null) return Optional.empty();
-        if (!header.startsWith("Bearer ")) return Optional.empty();
+        if (header == null || header.isBlank()) {
+            return Optional.empty();
+        }
+
+        if (!header.startsWith("Bearer ")) {
+            return Optional.empty();
+        }
+
         String token = header.substring("Bearer ".length()).trim();
         return token.isEmpty() ? Optional.empty() : Optional.of(token);
     }

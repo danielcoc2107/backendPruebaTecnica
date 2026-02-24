@@ -3,13 +3,16 @@ package com.acme.social.ws;
 
 import com.acme.social.application.dto.ToggleLikeResult;
 import com.acme.social.application.usecases.ToggleLikeUseCase;
+import com.acme.social.ws.dto.LikeUpdatedEvent;
 import com.acme.social.ws.dto.ToggleLikeWsRequest;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.security.Principal;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class LikeWsControllerTest {
@@ -30,14 +33,15 @@ class LikeWsControllerTest {
 
         controller.toggleLike(new ToggleLikeWsRequest(postId), principal);
 
-        verify(template).convertAndSend(
-                eq("/topic/posts/" + postId + "/likes"),
-                argThat(ev -> {
-                    // ev es LikeUpdatedEvent pero lo evaluamos por propiedades via toString simple
-                    return ev.toString().contains(postId.toString())
-                            && ev.toString().contains("liked=true")
-                            && ev.toString().contains("totalLikes=7");
-                })
-        );
+        String expectedTopic = "/topic/posts/" + postId + "/likes";
+
+        ArgumentCaptor<LikeUpdatedEvent> captor = ArgumentCaptor.forClass(LikeUpdatedEvent.class);
+
+        verify(template).convertAndSend(eq(expectedTopic), captor.capture());
+
+        LikeUpdatedEvent sent = captor.getValue();
+        assertEquals(postId, sent.postId());
+        assertTrue(sent.liked());
+        assertEquals(7, sent.totalLikes());
     }
 }
