@@ -37,7 +37,7 @@ public class SecurityConfig {
                 .cors(Customizer.withDefaults())
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/docs","/docs/**", "/v3/api-docs/**", "/actuator/**").permitAll()
+                        .requestMatchers("/docs", "/docs/**","/v3/api-docs", "/v3/api-docs/**","/swagger-ui.html","/swagger-ui", "/swagger-ui/**","/actuator/**").permitAll()
                         .requestMatchers("/ws/**").permitAll() // handshake SockJS
                         .requestMatchers("/api/auth/**").permitAll()
                         .anyRequest().authenticated()
